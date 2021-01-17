@@ -483,7 +483,7 @@ class ProductNotExist(CustomUserError):
         2020-12-30(고수희): 초기생성
     """
     def __init__(self, error_message):
-        status_code = 400
+        status_code = 404
         message = 'product does not exist'
         error_message = error_message
         super().__init__(status_code, message, error_message)

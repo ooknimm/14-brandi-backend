@@ -48,7 +48,7 @@ def signin_decorator(required=True):
                 payload = jwt.decode(
                     access_token,
                     current_app.config['JWT_SECRET_KEY'],
-                    current_app.config['JWT_ALGORITHM']
+                    algorithms=current_app.config['JWT_ALGORITHM']
                 )
 
                 g.username = payload['username']
