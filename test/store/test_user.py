@@ -1,5 +1,6 @@
 from unittest import mock, TestCase
 
+import json
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -17,21 +18,183 @@ class TestUser(TestCase):
         Author: 김민구
 
         History:
-            2020-20-30(김민구): 초기 생성
+            2020-12-30(김민구): 초기 생성
     """
 
     def setUp(self):
-        app = create_app(config.test_config)
-        self.connection = get_connection(app.config['DB'])
-        self.client = app.test_client()
+        self.app = create_app(config.test_config)
+        self.connection = get_connection(self.app.config['DB'])
+        self.client = self.app.test_client()
+
+        with self.connection.cursor() as cursor:
+            cursor.execute("INSERT INTO permission_types (`id`, `name`) VALUES (3, '일반유저')")
+        self.connection.commit()
+        self.connection.close()
 
     def tearDown(self):
+        self.connection = get_connection(self.app.config['DB'])
         with self.connection.cursor() as cursor:
             cursor.execute('set foreign_key_checks=0')
             cursor.execute('truncate accounts')
             cursor.execute('truncate users')
+            cursor.execute('truncate permission_types')
             cursor.execute('set foreign_key_checks=1')
         self.connection.close()
+
+    def test_user_signup(self):
+        data = json.dumps({
+            'username': 'brandi',
+            'email': 'brandi@naver.com',
+            'phone': '01099998888',
+            'password': '1q2w3e$R'
+        })
+
+        response = self.client.post(
+            '/users/signup',
+            data=data,
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+        assert json.loads(response.data)['message'] == 'success'
+
+    def test_user_signup_fail_invalid_data(self):
+        data = json.dumps({
+            'username': 'br',
+            'email': 'brandi@naver.com',
+            'phone': '01099998888',
+            'password': '1q2w3e$R'
+        })
+
+        response = self.client.post(
+            '/users/signup',
+            data=data,
+            content_type='application/json'
+        )
+
+        assert response.status_code == 400
+        assert json.loads(response.data)['error_message'] == 'username가(이) 유효하지 않습니다.'
+
+    def test_user_signup_fail_duplicate_data(self):
+        data = json.dumps({
+            'username': 'brandi',
+            'email': 'brandi@naver.com',
+            'phone': '01099998888',
+            'password': '1q2w3e$R'
+        })
+
+        data2 = json.dumps({
+            'username': 'brandi',
+            'email': 'brandi@gmail.com',
+            'phone': '01099998888',
+            'password': '1q2w3e$R'
+        })
+
+        response = self.client.post(
+            '/users/signup',
+            data=data,
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+
+        response = self.client.post(
+            '/users/signup',
+            data=data2,
+            content_type='application/json'
+        )
+
+        assert response.status_code == 403
+        assert json.loads(response.data)['error_message'] == '이미 사용중인 username, phone 입니다.'
+
+    def test_user_signin(self):
+        data = json.dumps({
+            'username': 'brandi',
+            'email': 'brandi@naver.com',
+            'phone': '01099998888',
+            'password': '1q2w3e$R'
+        })
+
+        response = self.client.post(
+            '/users/signup',
+            data=data,
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+
+        signin_data = json.dumps({
+            'username': 'brandi',
+            'password': '1q2w3e$R'
+        })
+        response = self.client.post(
+            '/users/signin',
+            data=signin_data,
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+        assert b'token' in response.data
+
+    def test_user_signin_fail_user_not_exist(self):
+        data = json.dumps({
+            'username': 'brandi',
+            'email': 'brandi@naver.com',
+            'phone': '01099998888',
+            'password': '1q2w3e$R'
+        })
+
+        response = self.client.post(
+            '/users/signup',
+            data=data,
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+
+        signin_data = json.dumps({
+            'username': 'brandi1',
+            'password': '1q2w3e$R'
+        })
+        response = self.client.post(
+            '/users/signin',
+            data=signin_data,
+            content_type='application/json'
+        )
+
+        assert response.status_code == 403
+        assert b'token' not in response.data
+        assert json.loads(response.data)['error_message'] == '로그인에 실패했습니다.'
+
+    def test_user_signin_fail_user_wrong_password(self):
+        data = json.dumps({
+            'username': 'brandi',
+            'email': 'brandi@naver.com',
+            'phone': '01099998888',
+            'password': '1q2w3e$R'
+        })
+
+        response = self.client.post(
+            '/users/signup',
+            data=data,
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+
+        signin_data = json.dumps({
+            'username': 'brandi',
+            'password': '1q2w3e$'
+        })
+        response = self.client.post(
+            '/users/signin',
+            data=signin_data,
+            content_type='application/json'
+        )
+
+        assert response.status_code == 403
+        assert b'token' not in response.data
+        assert json.loads(response.data)['error_message'] == '로그인에 실패했습니다.'
 
     @mock.patch('view.store.user_view.id_token')
     def test_social_sign_in(self, mock_id_token):
@@ -65,3 +228,17 @@ class TestUser(TestCase):
         )
         assert response.status_code == 200
         assert b'token' in response.data
+
+    @mock.patch('view.store.user_view.id_token')
+    def test_social_signin_fail_no_token(self, mock_id_token):
+
+        mock_id_token.verify_oauth2_token.return_value = {
+            "name": "test_user@gmail.com"
+        }
+        response = self.client.post(
+            '/users/social-signin',
+            headers={'Authorization': 'google_token'}
+        )
+
+        assert response.status_code == 403
+        assert json.loads(response.data)['error_message'] == '구글 소셜 로그인에 실패하였습니다.'

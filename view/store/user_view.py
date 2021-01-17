@@ -229,6 +229,9 @@ class GoogleSocialSignInView(MethodView):
             connection = get_connection(self.database)
             user_info = id_token.verify_oauth2_token(google_token, requests.Request())
 
+            if 'email' not in user_info:
+                raise InvalidToken('구글 소셜 로그인에 실패하였습니다.')
+
             token = self.user_service.social_sign_in_logic(connection, user_info)
             connection.commit()
             return jsonify({'message': 'success', 'token': token}), 200
