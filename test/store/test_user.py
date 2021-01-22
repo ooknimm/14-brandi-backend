@@ -211,7 +211,7 @@ class TestUser(TestCase):
                 True: b'token' in response.data   : 유저 로그인 성공 토큰 확인 여부
 
             History:
-                2020-20-30(김민구): 초기 생성
+                2020-12-30(김민구): 초기 생성
 
             Notes:
                 소셜 로그인 구조상 Integration Test를 하기 힘들기 때문에 간략하게 성공 케이스를 확인하는 용도로 작성
