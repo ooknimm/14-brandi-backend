@@ -37,7 +37,7 @@
 
 
 ### 5. API문서 보러가기
-* [클릭](https://www.notion.so/14th-Brandi-API-a35616653ef147818e228c9920d87a96)
+* [클릭](https://www.notion.so/14th-Brandi-API-8597e846c6b644b4b3e48bee4a144248)
 
 
 ### 6. 사용한 기술 스택
